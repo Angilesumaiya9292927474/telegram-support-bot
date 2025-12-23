@@ -2,7 +2,7 @@ import logging
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 
-BOT_TOKEN = "7985647210:AAE-qLc8cwgOJOjtzmVpAIhU9I9Clc63TXo"
+BOT_TOKEN = "7985647210:AAHmkdyOVxKeaQjm077d5tEr6USjp_IuPtM"
 ADMINS = {6187018016}
 
 users = set()
