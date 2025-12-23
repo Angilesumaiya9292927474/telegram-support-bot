@@ -1,47 +1,42 @@
 import os
 import logging
 from telegram import Update
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    MessageHandler,
-    ContextTypes,
-    filters
-)
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
-# ============ LOGGING ============
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
-# ============ CONFIG ============
-BOT_TOKEN = os.environ.get("BOT_TOKEN")   # Railway Variables থেকে নেবে
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMINS = {6187018016}
 
 if not BOT_TOKEN:
-    raise ValueError("BOT_TOKEN missing in Railway Variables!")
+    raise RuntimeError("BOT_TOKEN missing!")
 
 users = set()
 blocked_users = set()
 
-# ============ COMMANDS ============
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     users.add(user.id)
+
     if user.id in blocked_users:
         return
+
     await update.message.reply_text(
-        "👋 Welcome to Support Bot\n\n"
-        "📩 /contact - Admin কে মেসেজ পাঠাও\n"
-        "👑 /admin - Admin panel"
+        f"👋 Hello {user.first_name}\n\n"
+        "🤖 Support Bot Active\n"
+        "📩 /contact - Send message to admin\n"
+        "👑 /admin - Admin Panel"
     )
 
 async def contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data["contact_mode"] = True
-    await update.message.reply_text("✍️ তোমার মেসেজ লিখো:")
+    context.user_data["contact"] = True
+    await update.message.reply_text("✍️ Write your message for admin:")
 
-async def user_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    if context.user_data.get("contact_mode"):
+    users.add(user.id)
+
+    if context.user_data.get("contact"):
         for admin in ADMINS:
             await context.bot.send_message(
                 admin,
@@ -50,23 +45,25 @@ async def user_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"ID: {user.id}\n\n"
                 f"{update.message.text}"
             )
-        await update.message.reply_text("✅ Message admin এর কাছে পাঠানো হয়েছে")
-        context.user_data["contact_mode"] = False
+        await update.message.reply_text("✅ Message sent to admin")
+        context.user_data["contact"] = False
 
 async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id not in ADMINS:
         return
+
     await update.message.reply_text(
         f"👑 Admin Panel\n\n"
-        f"👥 Total Users: {len(users)}\n\n"
-        f"/broadcast <msg>\n"
-        f"/block <user_id>\n"
-        f"/unblock <user_id>"
+        f"Total Users: {len(users)}\n\n"
+        "/broadcast <msg>\n"
+        "/block <id>\n"
+        "/unblock <id>"
     )
 
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id not in ADMINS:
         return
+
     msg = " ".join(context.args)
     sent = 0
     for u in users:
@@ -76,7 +73,8 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 sent += 1
             except:
                 pass
-    await update.message.reply_text(f"Sent to {sent} users")
+
+    await update.message.reply_text(f"✅ Sent to {sent} users")
 
 async def block_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id not in ADMINS:
@@ -90,7 +88,6 @@ async def unblock_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     blocked_users.discard(int(context.args[0]))
     await update.message.reply_text("✅ User unblocked")
 
-# ============ MAIN ============
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
@@ -100,7 +97,7 @@ def main():
     app.add_handler(CommandHandler("broadcast", broadcast))
     app.add_handler(CommandHandler("block", block_user))
     app.add_handler(CommandHandler("unblock", unblock_user))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, user_message))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
 
     app.run_polling()
 
